@@ -2,21 +2,18 @@ package dev.ivansantos.TabelaFipe.principal;
 
 import dev.ivansantos.TabelaFipe.model.Dados;
 import dev.ivansantos.TabelaFipe.model.Modelos;
+import dev.ivansantos.TabelaFipe.model.Veiculo;
 import dev.ivansantos.TabelaFipe.service.ConsumoApi;
 import dev.ivansantos.TabelaFipe.service.ConverteDados;
-import dev.ivansantos.TabelaFipe.service.Nomeavel;
 
-import java.util.Arrays;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Scanner;
+import java.util.*;
 import java.util.stream.Collectors;
 
 public class Principal {
   private Scanner scanner = new Scanner(System.in);
   private ConsumoApi consumo = new ConsumoApi();
   private ConverteDados conversor = new ConverteDados();
-  private enum Veiculo {
+  private enum VeiculoTipo {
     CARRO(1,"carros"),
     MOTO(2, "motos"),
     CAMINHAO(3,"caminhoes");
@@ -24,7 +21,7 @@ public class Principal {
     private final int id;
     private final String nome;
 
-    Veiculo(int id, String nome) {
+    VeiculoTipo(int id, String nome) {
       this.id = id;
       this.nome = nome;
     }
@@ -37,8 +34,8 @@ public class Principal {
       return id;
     }
 
-    public static Veiculo fromId(int id) {
-      for (Veiculo veiculo : Veiculo.values()) {
+    public static VeiculoTipo fromId(int id) {
+      for (VeiculoTipo veiculo : VeiculoTipo.values()) {
         if (veiculo.getId() == id) {
           return veiculo;
         }
@@ -52,12 +49,12 @@ public class Principal {
   public void exibeMenu() {
 
     // Tipos de veiculos
-    List<Veiculo> tiposVeiculo = List.of(Veiculo.values());
+    List<VeiculoTipo> tiposVeiculo = List.of(VeiculoTipo.values());
     System.out.println("*** OPÇÕES ***");
     tiposVeiculo.forEach(System.out::println);
     System.out.print("Informe uma opção: ");
     int opcao = scanner.nextInt();
-    String endereco = URL_BASE + Veiculo.fromId(opcao).nome + "/marcas";
+    String endereco = URL_BASE + VeiculoTipo.fromId(opcao).nome + "/marcas";
 
     // Marcas
     var jsonMarcas = consultaApi(endereco);
@@ -65,9 +62,6 @@ public class Principal {
     imprimeOpcoesMenu(marcas);
     opcao = scanner.nextInt();
     endereco += "/" + opcao + "/modelos";
-
-
-    // Modelos
     var jsonModelos = consultaApi(endereco);
     var modelos = conversor.obterDados(jsonModelos, Modelos.class);
     int finalOpcaoMarca = opcao;
@@ -76,7 +70,21 @@ public class Principal {
             .collect(Collectors.toList()).get(0).getNome(); // Recupera nome da marca
     System.out.println("Você escolheu " + marca);
     System.out.println("Modelos da marca " + marca + ":");
-    imprimeOpcoesMenu(modelos.modelos());
+
+    // Filtra modelos
+    modelos.modelos().stream().forEach(System.out::println);
+    System.out.println("Informe o nome de um modelo da marca para filtrar: ");
+    scanner.nextLine();
+    var modeloFiltrado = scanner.nextLine();
+
+    System.out.println(modeloFiltrado);
+
+    List<Dados> modelosFiltrados = modelos.modelos().stream()
+            .filter(m -> m.nome().toLowerCase().contains(modeloFiltrado.toLowerCase()))
+                    .collect(Collectors.toList());
+
+    // Modelos
+    imprimeOpcoesMenu(modelosFiltrados);
     opcao = scanner.nextInt();
     int finalOpcaoModelo = opcao;
     var modelo = modelos.modelos().stream()
@@ -88,15 +96,17 @@ public class Principal {
     System.out.println("Você escolheu " + modelo);
     var jsonAnos = consultaApi(endereco);
     var anos = conversor.obterLista(jsonAnos, Dados.class);
-    System.out.println("Anos do modelo" + modelo);
-    imprimeOpcoesMenu(anos);
-    opcao = scanner.nextInt();
-    endereco += "/" + opcao;
+    List<Veiculo> veiculos = new ArrayList<>();
 
-    var jsonModeloAno = consultaApi(endereco);
-    var modeloAno = conversor.obterDados(jsonModeloAno, Dados.class);
-    System.out.println(modeloAno);
+    for (int i = 0; i < anos.size(); i++) {
+      var enderecoAnos = endereco + "/" + anos.get(i).codigo();
+      var jsonVeiculo = consumo.obterDados(enderecoAnos);
+      var veiculo = conversor.obterDados(jsonVeiculo, Veiculo.class);
+      veiculos.add(veiculo);
+    }
 
+    veiculos.stream()
+            .forEach(System.out::println);
 
     //"/modelos/{id_modelo}/anos/{ano}"
   }
